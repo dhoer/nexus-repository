@@ -1,8 +1,8 @@
 /*
  * Nexus APT plugin.
- * 
+ *
  * Copyright (c) 2016-Present Michael Poindexter.
- * 
+ *
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
@@ -15,6 +15,8 @@ import static org.sonatype.nexus.repository.storage.AssetEntityAdapter.P_ASSET_K
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collections;
+import java.util.Set;
 
 import javax.inject.Named;
 
@@ -32,22 +34,22 @@ import net.staticsnow.nexus.repository.apt.internal.hosted.AptHostedFacet.AssetA
 
 @Named
 public class AptHostedComponentMaintenanceFacet
-    extends DefaultComponentMaintenanceImpl
+        extends DefaultComponentMaintenanceImpl
 {
   @Transactional(retryOn = ONeedRetryException.class)
   @Override
-  protected void deleteAssetTx(EntityId assetId, boolean deleteBlobs) {
+  protected Set<String> deleteAssetTx(EntityId assetId, boolean deleteBlobs) {
     StorageTx tx = UnitOfWork.currentTx();
     Asset asset = tx.findAsset(assetId, tx.findBucket(getRepository()));
     if (asset == null) {
-      return;
+      return Collections.emptySet();
     }
     String assetKind = asset.formatAttributes().get(P_ASSET_KIND, String.class);
-    super.deleteAssetTx(assetId, deleteBlobs);
+    Set<String> result = super.deleteAssetTx(assetId, deleteBlobs);
     if ("DEB".equals(assetKind)) {
       try {
         getRepository().facet(AptHostedFacet.class)
-            .rebuildIndexes(new AptHostedFacet.AssetChange(AssetAction.REMOVED, asset));
+                .rebuildIndexes(new AptHostedFacet.AssetChange(AssetAction.REMOVED, asset));
       }
       catch (IOException e) {
         throw new UncheckedIOException(e);
@@ -56,5 +58,6 @@ public class AptHostedComponentMaintenanceFacet
         throw new RuntimeException(e);
       }
     }
+    return result;
   }
 }
